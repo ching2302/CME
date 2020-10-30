@@ -1,0 +1,175 @@
+//@version=3
+study("CME Open Interest", precision=0,overlay=false)
+ChkComm = input("", title="override symbol (SI/CL etc)", type=string)
+
+
+ChkPrelim = input(0, title="Prelim.OI", type=integer)
+Prelim=(ChkPrelim>0?ChkPrelim:0)
+
+fxroot =
+	  	  ticker == "XAUUSD" ? "GC" :
+	  	  ticker == "XAGUSD" ? "SI" :
+	  	  "" 
+ThisComm = ChkComm == "" ? fxroot == "" ? syminfo.root : fxroot : ChkComm
+// root = syminfo.root 
+code = ThisComm
+getCntrct(fut,num,max) =>
+    N=tostring(num)
+    C=num<=max?security("QUANDL:CHRIS/CME_"+fut+N+"|7", "D", close,barmerge.gaps_on, barmerge.lookahead_on):0
+    Cx=(C?C:0) // not na? OK, else 0
+// NUMBER OF CONTRACTS
+// CME Vol and Open Interesst page eg. for GOLD:
+// https://www.cmegroup.com/trading/metals/precious/gold_quotes_volume_voi.html?optid=7489&optionProductId=7488
+// Totals Volume & OI (last line of table) are not  exported 
+
+// CME data is recorded&exported daily by quandl.com to tradingview
+// via the che CHRIS/CME datasets
+// https://www.quandl.com/data/CHRIS
+// Eg. Nat GAs cntract n. 20, field n. 7(OI)
+// https://www.quandl.com/data/CHRIS/CME_NG20 (@quandl.com)
+// https://www.tradingview.com/e/?symbol=QUANDL:CHRIS/CME_NG20|7 (@tradingview)
+
+// This script tries to sum all the fut cntrcts' Vol&OI to obtain a fair total
+//
+// Number of cntrcts per commodity differ.
+// eg E-mini (ES) has 4 contracts, Gold(GC) 16 cntrcts, NatGas(NG) has 43, WTI(CL) has 38 etc
+// see https://s3.amazonaws.com/quandl-production-static/Ticker+CSV%27s/Futures/continuous.csv
+
+getNc(code)=>
+// set the N.of outstanding contracts per future code 
+    c=16               //default 16
+    c:=code=="AD"?2:c  //Australian Dollar  
+    c:=code=="BB"?5:c  //Brent Crude Oil  HMUZ
+    c:=code=="BP"?2:c  //British Pound  FGHJKMNQUVXZ
+    c:=code=="C"?11:c  //Corn  HMUZ
+    c:=code=="CD"?4:c  //Canadian Dollar  HKNUZ
+    c:=code=="CL"?38:c  //WTI Crude Oil  HMUZ 
+    c:=code=="CNH"?2:c  //Standard-Size USD/Offshore RMB (CNH)  FGHJKMNQUVXZ
+    c:=code=="EC"?2:c  //Euro FX  FGHJKMNQUVXZ
+    c:=code=="ES"?4:c  //E-mini S&P 500 Index  HMUZ
+    c:=code=="FC"?7:c  //Feeder Cattle  HMUZ
+    c:=code=="FV"?2:c  //5 Year Treasury Note  FHJKQUVX
+    c:=code=="GC"?16:c  //Gold  HMUZ
+    c:=code=="HG"?11:c  //Copper  GHJKMQVZ
+    c:=code=="HO"?17:c  //Heating Oil  FGHJKMNQUVXZ
+    c:=code=="IBV"?2:c  //Ibovespa Index  FGHJKMNQUVXZ
+    c:=code=="JY"?2:c  //Japanese Yen  GJMQVZ
+    c:=code=="LB"?2:c  //Lumber  HMUZ
+    c:=code=="LC"?7:c  //Live Cattle  FHKNUX
+    c:=code=="LN"?10:c  //Lean Hogs  GJMQVZ
+    c:=code=="ND"?2:c  //NASDAQ 100  GJKMNQVZ
+    c:=code=="NE"?2:c  //New Zealand Dollar  HMUZ
+    c:=code=="NF"?4:c  //Nonfat Dry Milk  HMUZ
+// as max securities for pine scripts is 40, NG has too many! lowered to 39
+//  c:=code=="NG"?43:c  //Natural Gas  FGHJKMNQUVXZ
+    c:=code=="NG"?39:c  //Natural Gas  FGHJKMNQUVXZ
+    c:=code=="NQ"?2:c  //E-mini NASDAQ 100 Index  HMUZ
+    c:=code=="O"?3:c  //Oats  HMUZ
+    c:=code=="PA"?2:c  //Palladium  HKNUZ
+    c:=code=="PL"?3:c  //Platinum  HJKMUZ
+    c:=code=="QL"?2:c  //Coal  FHJKNV
+    c:=code=="RB"?10:c  //Gasoline  FGHJKMNQUVXZ
+    c:=code=="RBB"?10:c  //RBOB Gasoline Brent Crack Spread  FGHJKMNQUVXZ
+    c:=code=="RP"?2:c  //Euro/British Pound  FGHJKMNQUVXZ
+    c:=code=="RR"?3:c  //Rough Rice  HMUZ
+    c:=code=="RU"?7:c  //Russian Ruble  FHKNUX
+    c:=code=="RY"?2:c  //Euro/Japanese Yen  FGHJKMNQUVXZ
+    c:=code=="S"?10:c  //Soybeans  HMUZ
+    c:=code=="SF"?2:c  //Swiss Franc  FHKNQUX
+    c:=code=="SI"?12:c  //Silver  HMUZ
+    c:=code=="SM"?11:c  //Soybean Meal  FHJKNUZ
+    c:=code=="SP"?3:c  //Full-Size S&P 500 Index  FHKNQUVZ
+    c:=code=="TRY"?2:c  //Turkish Lira  HMUZ
+    c:=code=="TU"?2:c  //2 Year Treasury Note  HMUZ
+    c:=code=="TY"?2:c  //10 Year Treasury Note  HMUZ
+    c:=code=="UL"?2:c  //Ultra Treasury Bond  HMUZ
+    c:=code=="US"?2:c  //30-Year Treasury Bond  HMUZ
+    c:=code=="W"?7:c  //Wheat  HMUZ
+    c:=code=="XAF"?2:c  //E-mini Financial Sector  HKNUZ
+    c:=code=="XAK"?2:c  //E-mini Technology Sector  HM
+    c:=code=="XAP"?2:c  //E-mini Consumer Staples Sector  HM
+    c:=code=="XAU"?2:c  //E-mini Utilities Sector  HM
+    c:=code=="XAY"?2:c  //E-mini Consumer Discretionary Sector  HM
+
+// unfortunately, "securuty" can't be called inside a for loop,so:
+
+C1=getCntrct(code,1,getNc(code))
+C2=getCntrct(code,2,getNc(code))
+C3=getCntrct(code,3,getNc(code))
+C4=getCntrct(code,4,getNc(code))
+C5=getCntrct(code,5,getNc(code))
+C6=getCntrct(code,6,getNc(code))
+C7=getCntrct(code,7,getNc(code))
+C8=getCntrct(code,8,getNc(code))
+C9=getCntrct(code,9,getNc(code))
+C10=getCntrct(code,10,getNc(code))
+C11=getCntrct(code,11,getNc(code))
+C12=getCntrct(code,12,getNc(code))
+C13=getCntrct(code,13,getNc(code))
+C14=getCntrct(code,14,getNc(code))
+C15=getCntrct(code,15,getNc(code))
+C16=getCntrct(code,16,getNc(code))
+C17=getCntrct(code,17,getNc(code))
+C18=getCntrct(code,18,getNc(code))
+C19=getCntrct(code,19,getNc(code))
+C20=getCntrct(code,20,getNc(code))
+C21=getCntrct(code,21,getNc(code))
+C22=getCntrct(code,22,getNc(code))
+C23=getCntrct(code,23,getNc(code))
+C24=getCntrct(code,24,getNc(code))
+C25=getCntrct(code,25,getNc(code))
+C26=getCntrct(code,26,getNc(code))
+C27=getCntrct(code,27,getNc(code))
+C28=getCntrct(code,28,getNc(code))
+C29=getCntrct(code,29,getNc(code))
+C30=getCntrct(code,30,getNc(code))
+C31=getCntrct(code,31,getNc(code))
+C32=getCntrct(code,32,getNc(code))
+C33=getCntrct(code,33,getNc(code))
+C34=getCntrct(code,34,getNc(code))
+C35=getCntrct(code,35,getNc(code))
+C36=getCntrct(code,36,getNc(code))
+C37=getCntrct(code,37,getNc(code))
+C38=getCntrct(code,38,getNc(code))
+C39=getCntrct(code,39,getNc(code))
+// max securities for scripts is 40!
+
+
+OiSum=C1+C2+C3+C4+C5+C6+C7+C8+C9+C10+C11+C12+C13+C14+C15+C16+C17+C18+C19+C20+C21+C22+C23+C24+C25+C26+C27
+     +C28+C29+C30+C31+C32+C33+C34+C35+C36+C37+C38+C39
+///////// CFTC COT Open Interest
+CftcOI = security("QUANDL:CFTC/"+code+"_F_ALL|0", "W", close, barmerge.gaps_off, barmerge.lookahead_on)
+plot(CftcOI, color=orange, title="CFTC COT OI", linewidth=1)
+// lastBar function
+lastBar=(barstate.islast and close ?  barstate.islast : na)
+lB=lastBar
+//day of week function
+isMon() => dayofweek(time('D')) == monday and close ? 1 : 0
+isTue() => dayofweek(time('D')) == tuesday and close ? 1 : 0
+isWed() => dayofweek(time('D')) == wednesday and close ? 1 : 0
+isThu() => dayofweek(time('D')) == thursday and close ? 1 : 0
+isFri() => dayofweek(time('D')) == friday and close ? 1 : 0
+NowIsSat() => dayofweek(timenow) == 7 ? 1: 0
+NowIsSun() => dayofweek(timenow) == 1 ? 1: 0
+//default label params to shorten command lines
+s=shape.labeldown
+l=location.absolute
+tc=black
+sz=size.tiny
+o=+1
+e=true
+tr=70
+// if lastblock is on Fri but we are on Sat or Sun...
+
+//OffSetPrelim=(Prelim>0?OffSet+1:OffSet)
+OffSet=-1
+//OffSetPrelim=OffSet
+OffSetPrelim=(NowIsSat() or NowIsSun()? 0:OffSet)
+// Sum of next 20 contracts OI
+plot(OiSum>0?OiSum:na, color=purple, title="CME EOD", linewidth=1,offset=OffSet)
+// If a Prelim has been entered
+//plot(lB and Prelim > 0?Prelim:na, offset=OffSetPrelim,  style=cross, color=black,title="Preliminary OI", linewidth=4)
+// labels
+//plotshape(lB and Prelim > 0?Prelim:na, show_last=1,color=black,text="Preliminary OI",editable=e,location=l,style=shape.cross,textcolor=black,size=size.small,offset=OffSetPrelim,transp=30)
+plotshape(lB and CftcOI?CftcOI:na, color=purple, text ="CME e-o-day OI ",editable=e,style=shape.labelup,location=l,textcolor=tc,size=s,offset=+1,transp=tr)
+plotshape(lB and CftcOI?CftcOI:na, color=orange, text="CFTC Weekly OI",editable=true,style=s,location=l,textcolor=tc,size=s,offset=+1,transp=tr)
