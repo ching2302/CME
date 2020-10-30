@@ -1,0 +1,191 @@
+//@version=4
+//Credit to https://www.tradingview.com/u/giancapino/ for the original script:  https://www.tradingview.com/script/7EvGzM0a-Open-Interest-CME-e-o-d-vs-CFTC-e-o-w/  Added Total Volume and OI/Volume.
+study("CME Total Volume", precision=0, overlay=false)
+ChkComm = input("", title="override symbol (SI/CL etc)", type=input.string)
+VolAvgNum = input(20, title="Volume SMA", type=input.integer)
+
+ChkPrelim = input(0, title="Prelim.OI", type=input.integer)
+Prelim = ChkPrelim > 0 ? ChkPrelim : 0
+
+fxroot = syminfo.ticker == "XAUUSD" ? "GC" : syminfo.ticker == "XAGUSD" ? "SI" : ""
+ThisComm = ChkComm == "" ? fxroot == "" ? syminfo.root : fxroot : ChkComm
+// root = syminfo.root 
+code = ThisComm
+getCntrctOI(fut, num, max) =>
+    N = tostring(num)
+    security_1 = security("QUANDL:CHRIS/CME_" + fut + N + "|7", "D", close, barmerge.gaps_on, barmerge.lookahead_on)
+    C = num <= max ? security_1 : 0
+    Cx = C ? C : 0  // not na? OK, else 0
+    Cx
+getCntrctTV(fut, num, max) =>
+    N = tostring(num)
+    security_1 = security("QUANDL:CHRIS/CME_" + fut + N + "|6", "D", close, barmerge.gaps_on, barmerge.lookahead_on)
+    C = num <= max ? security_1 : 0
+    Cx = C ? C : 0  // not na? OK, else 0
+    Cx
+// NUMBER OF CONTRACTS
+// CME Vol and Open Interesst page eg. for GOLD:
+// https://www.cmegroup.com/trading/metals/precious/gold_quotes_volume_voi.html?optid=7489&optionProductId=7488
+// Totals Volume & OI (last line of table) are not  exported 
+
+// CME data is recorded&exported daily by quandl.com to tradingview
+// via the che CHRIS/CME datasets
+// https://www.quandl.com/data/CHRIS
+// Eg. Nat GAs cntract n. 20, field n. 7(OI)
+// https://www.quandl.com/data/CHRIS/CME_NG20 (@quandl.com)
+// https://www.tradingview.com/e/?symbol=QUANDL:CHRIS/CME_NG20|7 (@tradingview)
+
+// This script tries to sum all the fut cntrcts' Vol&OI to obtain a fair total
+//
+// Number of cntrcts per commodity differ.
+// eg E-mini (ES) has 4 contracts, Gold(GC) 16 cntrcts, NatGas(NG) has 43, WTI(CL) has 38 etc
+// see https://s3.amazonaws.com/quandl-production-static/Ticker+CSV%27s/Futures/continuous.csv
+
+getNc(code) =>
+// set the N.of outstanding contracts per future code 
+    c = 16  //default 16
+    c := code == "AD" ? 2 : c  //Australian Dollar  
+    c := code == "BB" ? 5 : c  //Brent Crude Oil  HMUZ
+    c := code == "BP" ? 2 : c  //British Pound  FGHJKMNQUVXZ
+    c := code == "C" ? 11 : c  //Corn  HMUZ
+    c := code == "CD" ? 4 : c  //Canadian Dollar  HKNUZ
+    c := code == "CL" ? 38 : c  //WTI Crude Oil  HMUZ 
+    c := code == "CNH" ? 2 : c  //Standard-Size USD/Offshore RMB (CNH)  FGHJKMNQUVXZ
+    c := code == "EC" ? 2 : c  //Euro FX  FGHJKMNQUVXZ
+    c := code == "ES" ? 4 : c  //E-mini S&P 500 Index  HMUZ
+    c := code == "FC" ? 7 : c  //Feeder Cattle  HMUZ
+    c := code == "FV" ? 2 : c  //5 Year Treasury Note  FHJKQUVX
+    c := code == "GC" ? 16 : c  //Gold  HMUZ
+    c := code == "HG" ? 11 : c  //Copper  GHJKMQVZ
+    c := code == "HO" ? 17 : c  //Heating Oil  FGHJKMNQUVXZ
+    c := code == "IBV" ? 2 : c  //Ibovespa Index  FGHJKMNQUVXZ
+    c := code == "JY" ? 2 : c  //Japanese Yen  GJMQVZ
+    c := code == "LB" ? 2 : c  //Lumber  HMUZ
+    c := code == "LC" ? 7 : c  //Live Cattle  FHKNUX
+    c := code == "LN" ? 10 : c  //Lean Hogs  GJMQVZ
+    c := code == "ND" ? 2 : c  //NASDAQ 100  GJKMNQVZ
+    c := code == "NE" ? 2 : c  //New Zealand Dollar  HMUZ
+    c := code == "NF" ? 4 : c  //Nonfat Dry Milk  HMUZ
+// as max securities for pine scripts is 40, NG has too many! lowered to 39
+//  c:=code=="NG"?43:c  //Natural Gas  FGHJKMNQUVXZ
+    c := code == "NG" ? 39 : c  //Natural Gas  FGHJKMNQUVXZ
+    c := code == "NQ" ? 2 : c  //E-mini NASDAQ 100 Index  HMUZ
+    c := code == "O" ? 3 : c  //Oats  HMUZ
+    c := code == "PA" ? 2 : c  //Palladium  HKNUZ
+    c := code == "PL" ? 3 : c  //Platinum  HJKMUZ
+    c := code == "QL" ? 2 : c  //Coal  FHJKNV
+    c := code == "RB" ? 10 : c  //Gasoline  FGHJKMNQUVXZ
+    c := code == "RBB" ? 10 : c  //RBOB Gasoline Brent Crack Spread  FGHJKMNQUVXZ
+    c := code == "RP" ? 2 : c  //Euro/British Pound  FGHJKMNQUVXZ
+    c := code == "RR" ? 3 : c  //Rough Rice  HMUZ
+    c := code == "RU" ? 7 : c  //Russian Ruble  FHKNUX
+    c := code == "RY" ? 2 : c  //Euro/Japanese Yen  FGHJKMNQUVXZ
+    c := code == "S" ? 10 : c  //Soybeans  HMUZ
+    c := code == "SF" ? 2 : c  //Swiss Franc  FHKNQUX
+    c := code == "SI" ? 12 : c  //Silver  HMUZ
+    c := code == "SM" ? 11 : c  //Soybean Meal  FHJKNUZ
+    c := code == "SP" ? 3 : c  //Full-Size S&P 500 Index  FHKNQUVZ
+    c := code == "TRY" ? 2 : c  //Turkish Lira  HMUZ
+    c := code == "TU" ? 2 : c  //2 Year Treasury Note  HMUZ
+    c := code == "TY" ? 2 : c  //10 Year Treasury Note  HMUZ
+    c := code == "UL" ? 2 : c  //Ultra Treasury Bond  HMUZ
+    c := code == "US" ? 2 : c  //30-Year Treasury Bond  HMUZ
+    c := code == "W" ? 7 : c  //Wheat  HMUZ
+    c := code == "XAF" ? 2 : c  //E-mini Financial Sector  HKNUZ
+    c := code == "XAK" ? 2 : c  //E-mini Technology Sector  HM
+    c := code == "XAP" ? 2 : c  //E-mini Consumer Staples Sector  HM
+    c := code == "XAU" ? 2 : c  //E-mini Utilities Sector  HM
+    c := code == "XAY" ? 2 : c  //E-mini Consumer Discretionary Sector  HM
+    c
+
+// unfortunately, "securuty" can't be called inside a for loop,so:
+
+//C1 = getCntrctOI(code, 1, getNc(code))
+//C2 = getCntrctOI(code, 2, getNc(code))
+//C3 = getCntrctOI(code, 3, getNc(code))
+//C4 = getCntrctOI(code, 4, getNc(code))
+//C5 = getCntrctOI(code, 5, getNc(code))
+//C6 = getCntrctOI(code, 6, getNc(code))
+//C7 = getCntrctOI(code, 7, getNc(code))
+//C8 = getCntrctOI(code, 8, getNc(code))
+//C9 = getCntrctOI(code, 9, getNc(code))
+//C10 = getCntrctOI(code, 10, getNc(code))
+//C11 = getCntrctOI(code, 11, getNc(code))
+//C12 = getCntrctOI(code, 12, getNc(code))
+//C13 = getCntrctOI(code, 13, getNc(code))
+//C14 = getCntrctOI(code, 14, getNc(code))
+//C15 = getCntrctOI(code, 15, getNc(code))
+//C16 = getCntrctOI(code, 16, getNc(code))
+//C17 = getCntrctOI(code, 17, getNc(code))
+//C18 = getCntrctOI(code, 18, getNc(code))
+//C19 = getCntrctOI(code, 19, getNc(code))
+//C20 = getCntrctOI(code, 20, getNc(code))
+// max securities for scripts is 40!
+
+
+//OiSum = C1 + C2 + C3 + C4 + C5 + C6 + C7 + C8 + C9 + C10 + C11 + C12 + C13 + C14 + C15 + C16 + C17 + C18 + C19 + C20
+   
+//TotalVol function
+
+TVC1 = getCntrctTV(code, 1, getNc(code))
+TVC2 = getCntrctTV(code, 2, getNc(code))
+TVC3 = getCntrctTV(code, 3, getNc(code))
+TVC4 = getCntrctTV(code, 4, getNc(code))
+TVC5 = getCntrctTV(code, 5, getNc(code))
+TVC6 = getCntrctTV(code, 6, getNc(code))
+TVC7 = getCntrctTV(code, 7, getNc(code))
+TVC8 = getCntrctTV(code, 8, getNc(code))
+TVC9 = getCntrctTV(code, 9, getNc(code))
+TVC10 = getCntrctTV(code, 10, getNc(code))
+TVC11 = getCntrctTV(code, 11, getNc(code))
+TVC12 = getCntrctTV(code, 12, getNc(code))
+TVC13 = getCntrctTV(code, 13, getNc(code))
+TVC14 = getCntrctTV(code, 14, getNc(code))
+TVC15 = getCntrctTV(code, 15, getNc(code))
+TVC16 = getCntrctTV(code, 16, getNc(code))
+TVC17 = getCntrctTV(code, 17, getNc(code))
+TVC18 = getCntrctTV(code, 18, getNc(code))
+TVC19 = getCntrctTV(code, 19, getNc(code))
+// max securities for scripts is 40!
+
+
+TotalVol = TVC1 + TVC2 + TVC3 + TVC4 + TVC5 + TVC6 + TVC7 + TVC8 + TVC9 + TVC10 + TVC11 + TVC12 + TVC13 + TVC14 + TVC15 + 
+   TVC16 + TVC17 + TVC18 + TVC19
+
+lastBar = barstate.islast and close ? barstate.islast : na
+lB = lastBar
+//day of week function
+isMon() =>
+    dayofweek(time('D')) == dayofweek.monday and close ? 1 : 0
+isTue() =>
+    dayofweek(time('D')) == dayofweek.tuesday and close ? 1 : 0
+isWed() =>
+    dayofweek(time('D')) == dayofweek.wednesday and close ? 1 : 0
+isThu() =>
+    dayofweek(time('D')) == dayofweek.thursday and close ? 1 : 0
+isFri() =>
+    dayofweek(time('D')) == dayofweek.friday and close ? 1 : 0
+NowIsSat() =>
+    dayofweek(timenow) == 7 ? 1 : 0
+NowIsSun() =>
+    dayofweek(timenow) == 1 ? 1 : 0
+//default label params to shorten command lines
+s = shape.labeldown
+l = location.absolute
+tc = color.black
+sz = size.tiny
+o = +1
+e = true
+tr = 70
+// if lastblock is on Fri but we are on Sat or Sun...
+
+//OffSetPrelim=(Prelim>0?OffSet+1:OffSet)
+OffSet = 0
+//OffSetPrelim=OffSet
+OffSetPrelim = NowIsSat() or NowIsSun() ? 0 : OffSet
+// Sum of next 20 contracts OI
+//Plot Total Volume
+plot(TotalVol > 0 ? TotalVol : na, color=color.gray, title="Total Volume", linewidth=3, offset=OffSet, style=plot.style_columns)
+VolAvg= sma(TotalVol,VolAvgNum)
+plot(VolAvg, color=color.blue, title="MA", linewidth=1)
+
